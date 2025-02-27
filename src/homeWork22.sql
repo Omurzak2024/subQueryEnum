@@ -90,13 +90,28 @@ INSERT INTO patients (first_name, last_name, phone_number, email, gender, hospit
 
 
 --1. 'Surgical' бөлүмүндө дарыланып жаткан бардык пациенттерди табуу
-select department_name, concat(first_name,' ',last_name) as full_name from departments d join patients p on d.hospital_id = p.hospital_id where department_name='Surgical';
+select * from patients p
+where doctor_id in (select d.id from doctors d
+                    where department_id in
+                          (select d2.id from departments d2 where department_name='Surgical'));
+SELECT *
+FROM patients
+WHERE doctor_id IN (
+    SELECT d.id
+    FROM doctors d
+             JOIN departments dep ON d.department_id = dep.id
+    WHERE dep.department_name IN ('Surgical', 'Intensive')
+);
+
 --2. 'John' аттуу дарыгер иштеген бардык бөлүмдөрдүн тизмесин алуу
-select department_name,first_name from departments d join doctors d2 on d.id = d2.department_id where first_name='John';
+select * from departments d where d.id in (select doctors.department_id from doctors where first_name='John');
+
 --3. Дарыгеринин тажрыйбасы 10 жылдан ашкан бардык пациенттерди табуу
-select * from patients p join doctors d on p.doctor_id = d.id where experience>10;
+select * from patients p where p.doctor_id in (select d.id from doctors d where experience>10);
 --4. Бардык дарыгерлердин жана алардын тейлеген пациенттеринин санын алуу
-select concat(d.first_name,' ',d.last_name) as full_name,count(p.id) as patient_count from doctors d join patients p on d.id = p.doctor_id group by full_name;
+select concat(d.first_name,' ',d.last_name) as full_name,count(p.id) as patient_count from doctors d
+                                                                                               join patients p on d.id = p.doctor_id group by full_name;
+select first_name,count(*) from doctors d where d.id in (select p.doctor_id from patients p) group by first_name ;
 --5. Эч бир дарыгер тейлебеген бардык пациенттердин тизмесин алуу
 select * from doctors d right join patients p on d.id = p.doctor_id;
 select * from patients where doctor_id is null ;
@@ -110,7 +125,17 @@ FROM doctors d
          JOIN patients p ON d.id = p.doctor_id
 WHERE p.date_of_birth <= CURRENT_DATE - INTERVAL '60 years';
 --8. 'Anna' аттуу жана 'Smith' фамилиялуу дарыгерден дарыланып жаткан бардык пациенттерди табуу
-select p.id, p.first_name, p.last_name, p.phone_number, p.email, p.gender from patients p join doctors d on d.id = p.doctor_id where d.first_name='Anna' and d.last_name='Smith';
+select p.id, p.first_name, p.last_name, p.phone_number, p.email, p.gender from patients p
+                                                                                   join doctors d on d.id = p.doctor_id where d.first_name='Anna' and d.last_name='Smith';
+
+SELECT *
+FROM patients
+WHERE doctor_id = (
+    SELECT id
+    FROM doctors
+    WHERE first_name = 'Anna' AND last_name = 'Smith'
+);
+
 --9. 'Intensive' бөлүмүндө иштеген жана 3төн көп пациентти тейлеген бардык дарыгерлердин тизмесин алуу
 select d.id, d.first_name, d.last_name, d.experience, d.email, d.gender, d.specialization from doctors d
                                                                                                    join departments d2 on d.department_id = d2.id
@@ -126,6 +151,22 @@ WHERE dep.department_name = 'Intensive'
 GROUP BY d.id, d.first_name, d.last_name, d.experience, d.email, d.gender, d.specialization
 HAVING COUNT(p.id) > 3;
 
+SELECT *
+FROM doctors
+WHERE id IN (
+    SELECT doctor_id
+    FROM patients
+    WHERE doctor_id IN (
+        SELECT d.id
+        FROM doctors d
+                 JOIN departments dep ON d.department_id = dep.id
+        WHERE dep.department_name = 'Intensive'
+    )
+    GROUP BY doctor_id
+    HAVING COUNT(*) > 3
+);
+
+
 --10. Тажрыйбасы 5 жылдан аз болгон дарыгерлер пациенттерди дарылоочу бөлүмдөрдүн тизмесин алуу
 select department_name,d2.first_name,experience from departments d join doctors d2 on d.id = d2.department_id join patients p on d2.id = p.doctor_id where experience<5;
 --11. 'DERMOTOLOGIST' адистигине ээ болгон дарыгерден дарыланып жаткан бардык пациенттерди табуу
@@ -139,11 +180,26 @@ WITH specialization_counts AS (
     GROUP BY specialization
     ORDER BY doctor_count ASC
     LIMIT 1
-    )
+)
 SELECT p.*
 FROM patients p
          JOIN doctors d ON p.doctor_id = d.id
 WHERE d.specialization = (SELECT specialization FROM specialization_counts);
+
+SELECT *
+FROM patients
+WHERE doctor_id IN (
+    SELECT id
+    FROM doctors
+    WHERE specialization = (
+        SELECT specialization
+        FROM doctors
+        GROUP BY specialization
+        ORDER BY COUNT(*) ASC
+        LIMIT 1
+    )
+);
+
 
 --14. 'CARDIOLOGIST' адистиги бар дарыгер тейлеген бардык пациенттерди табуу
 select * from patients p join doctors d on d.id = p.doctor_id where specialization='Cardiologist';
@@ -154,5 +210,24 @@ select d.* from doctors d
 where department_name='Neurology'
 group by d.id
 having count(p.id)>3;
+
+SELECT *
+FROM doctors
+WHERE id IN (
+    SELECT doctor_id
+    FROM patients
+    WHERE doctor_id IN (
+        SELECT d.id
+        FROM doctors d
+                 JOIN departments dep ON d.department_id = dep.id
+        WHERE dep.department_name = 'Neurology'
+    )
+    GROUP BY doctor_id
+    HAVING COUNT(*) > 3
+);
+
+
+
+
 
 
